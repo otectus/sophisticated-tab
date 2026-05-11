@@ -16,12 +16,14 @@ public final class SophisticatedBackpacksSizing {
 
     public static int getWidth(Player player) {
         return SophisticatedBackpacksLocator.findFirstBackpack(player)
+                .map(BackpackDescriptor::wrapper)
                 .map(SophisticatedBackpacksSizing::computeWidth)
                 .orElse(VANILLA_INVENTORY_WIDTH);
     }
 
     public static int getHeight(Player player) {
         return SophisticatedBackpacksLocator.findFirstBackpack(player)
+                .map(BackpackDescriptor::wrapper)
                 .map(SophisticatedBackpacksSizing::computeHeight)
                 .orElse(VANILLA_INVENTORY_HEIGHT);
     }

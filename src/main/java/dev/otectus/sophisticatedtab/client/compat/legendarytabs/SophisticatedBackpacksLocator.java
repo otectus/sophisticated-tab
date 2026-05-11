@@ -1,31 +1,39 @@
 package dev.otectus.sophisticatedtab.client.compat.legendarytabs;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 
 import net.minecraft.world.entity.player.Player;
-import net.p3pp3rf1y.sophisticatedbackpacks.api.CapabilityBackpackWrapper;
-import net.p3pp3rf1y.sophisticatedbackpacks.backpack.wrapper.IBackpackWrapper;
 import net.p3pp3rf1y.sophisticatedbackpacks.util.PlayerInventoryProvider;
 
 public final class SophisticatedBackpacksLocator {
     private SophisticatedBackpacksLocator() {}
 
-    public static Optional<IBackpackWrapper> findFirstBackpack(Player player) {
+    // Walks every backpack-bearing slot Sophisticated Backpacks knows about:
+    // Curios/Cosmetic Armor (prepended by SB's compat handlers), main inventory,
+    // offhand, armor. Iteration order is stable across frames as long as stacks
+    // don't move; the callback always returns false so PlayerInventoryProvider
+    // visits every slot rather than stopping at the first match.
+    public static List<BackpackDescriptor> findAllBackpacks(Player player) {
         if (player == null) {
-            return Optional.empty();
+            return Collections.emptyList();
         }
-
-        AtomicReference<IBackpackWrapper> result = new AtomicReference<>();
+        List<BackpackDescriptor> result = new ArrayList<>();
         PlayerInventoryProvider.get().runOnBackpacks(player, (stack, handlerName, identifier, slot) -> {
-            stack.getCapability(CapabilityBackpackWrapper.BACKPACK_WRAPPER_CAPABILITY)
-                    .ifPresent(result::set);
-            return result.get() != null;
+            BackpackDescriptor.from(stack, handlerName, identifier, slot).ifPresent(result::add);
+            return false;
         });
-        return Optional.ofNullable(result.get());
+        return result;
+    }
+
+    public static Optional<BackpackDescriptor> findFirstBackpack(Player player) {
+        List<BackpackDescriptor> all = findAllBackpacks(player);
+        return all.isEmpty() ? Optional.empty() : Optional.of(all.get(0));
     }
 
     public static boolean hasOpenableBackpack(Player player) {
-        return findFirstBackpack(player).isPresent();
+        return !findAllBackpacks(player).isEmpty();
     }
 }

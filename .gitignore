@@ -26,3 +26,9 @@ forge-*-changelog.txt
 # Local IDE workspace artifacts
 *.bak
 *.swp
+
+# .tools/ holds local helper scripts and reference artifacts. We commit the
+# generator script but exclude the rest (LegendaryTabs atlas copy used as
+# input, throwaway investigation scripts, preview PNGs).
+.tools/*
+!.tools/generate_tab_chrome.py
