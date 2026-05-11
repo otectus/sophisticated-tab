@@ -1,0 +1,28 @@
+# Gradle
+.gradle/
+build/
+out/
+bin/
+run/
+run-data/
+
+# Eclipse / IntelliJ
+*.launch
+.classpath
+.project
+.settings/
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# VS Code
+.vscode/
+
+# Forge
+src/generated/resources/.cache/
+forge-*-changelog.txt
+
+# Local IDE workspace artifacts
+*.bak
+*.swp
