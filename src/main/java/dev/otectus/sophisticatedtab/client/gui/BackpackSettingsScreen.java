@@ -42,6 +42,13 @@ public final class BackpackSettingsScreen extends Screen {
     private static final int DIVIDER_COLOR = 0xFF505050;
     private static final ItemStack PLACEHOLDER_ICON = new ItemStack(Items.BARRIER);
 
+    // Pose-Z baseline for our overlay draws. The parent screen renders items
+    // via ItemRenderer at Z up to ~150 (slot quad + item model offsets); without
+    // a forward translate, our panel BG (drawn via GuiGraphics.fill at Z=0) loses
+    // the depth test on every pixel an item occupies. 400 also matches vanilla's
+    // tooltip Z so our content never sits beneath a stale tooltip residue.
+    private static final float OVERLAY_Z = 400.0f;
+
     private final Screen parent;
 
     private int panelX;
@@ -211,10 +218,13 @@ public final class BackpackSettingsScreen extends Screen {
         if (parent != null) {
             parent.render(graphics, -1, -1, partialTick);
         }
+        graphics.pose().pushPose();
+        graphics.pose().translate(0.0f, 0.0f, OVERLAY_Z);
         graphics.fillGradient(0, 0, this.width, this.height, 0x40000000, 0x80000000);
         renderPanel(graphics, mouseX, mouseY);
         super.render(graphics, mouseX, mouseY, partialTick);
         renderListContent(graphics, mouseX, mouseY);
+        graphics.pose().popPose();
         expireConfirmIfStale();
     }
 

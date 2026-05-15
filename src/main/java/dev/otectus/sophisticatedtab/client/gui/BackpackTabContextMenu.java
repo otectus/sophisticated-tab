@@ -28,6 +28,12 @@ public final class BackpackTabContextMenu extends Screen {
     private static final int BG_COLOR = 0xF0202020;
     private static final int BORDER_COLOR = 0xFFAAAAAA;
 
+    // Forward pose Z so the dim + menu BG sit above parent inventory items
+    // (which render at Z ~100-150 via ItemRenderer). Same rationale as in
+    // BackpackSettingsScreen — without this, parent items pass the depth test
+    // and remain visible through the panel.
+    private static final float OVERLAY_Z = 400.0f;
+
     private final Screen parent;
     private final BackpackDescriptor target;
     private final int anchorX;
@@ -97,6 +103,8 @@ public final class BackpackTabContextMenu extends Screen {
         if (parent != null) {
             parent.render(graphics, -1, -1, partialTick);
         }
+        graphics.pose().pushPose();
+        graphics.pose().translate(0.0f, 0.0f, OVERLAY_Z);
         graphics.fillGradient(0, 0, this.width, this.height, 0x40000000, 0x60000000);
 
         // Menu background + border.
@@ -105,6 +113,7 @@ public final class BackpackTabContextMenu extends Screen {
 
         RenderSystem.enableBlend();
         super.render(graphics, mouseX, mouseY, partialTick);
+        graphics.pose().popPose();
     }
 
     @Override

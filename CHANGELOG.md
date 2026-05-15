@@ -9,6 +9,12 @@ All notable changes to **Sophisticated Tab** are documented here. Format roughly
 - **NeoForge 1.21.1 port** if upstream Legendary Tabs and Sophisticated Backpacks both publish 1.21.1 builds.
 - **Sub-backpack tabs** — enumerate nested backpacks (`BackpackContext$ItemSubBackpack`) instead of stopping at top-level only.
 
+## [1.20.1-0.5.1] - 2026-05-14
+
+### Fixed
+
+- **Settings panel and right-click context menu no longer leak the parent inventory through their backgrounds.** The v0.5.0 implementations of [BackpackSettingsScreen.java](src/main/java/dev/otectus/sophisticatedtab/client/gui/BackpackSettingsScreen.java) and [BackpackTabContextMenu.java](src/main/java/dev/otectus/sophisticatedtab/client/gui/BackpackTabContextMenu.java) rendered the parent screen first (correct, intentional — we want the parent dimmed behind us) and then drew the panel via `GuiGraphics.fill(...)` at the pose's default Z=0. Because `ItemRenderer.renderGuiItem` in 1.20.1 translates Z forward (slot quad +100, item model +50), every item the parent rendered lived at Z ≈ 100–150 and **won** the depth test against our Z=0 panel fragments. Result: backpack tabs, inventory slots, hotbar items, and any HUD-adjacent widgets (e.g. JEI's search box) stayed crisply visible inside the panel rectangle while the panel outline survived only in the gaps between items. Fix is to `pose().pushPose()` + `translate(0, 0, 400)` before drawing the dim, panel BG, widgets, and list content, then `popPose()` once they're all in. Z=400 also matches vanilla `Screen.renderTooltipInternal`'s tooltip Z so our content can never sit under stale tooltip residue from the parent.
+
 ## [1.20.1-0.5.0] - 2026-05-14
 
 ### Added — User-configurable tab order, hiding, and settings
