@@ -1,4 +1,28 @@
 {
   "tooltip.sophisticatedtab.tab.inventory": "Return to Inventory",
-  "tooltip.sophisticatedtab.tab.backpack_empty": "No backpack"
+  "tooltip.sophisticatedtab.tab.backpack_empty": "No backpack",
+  "tooltip.sophisticatedtab.tab.settings": "Tab Settings",
+
+  "gui.sophisticatedtab.context.title": "Backpack Tab",
+  "gui.sophisticatedtab.context.open": "Open Backpack",
+  "gui.sophisticatedtab.context.moveLeft": "Move Left",
+  "gui.sophisticatedtab.context.moveRight": "Move Right",
+  "gui.sophisticatedtab.context.hide": "Hide This Backpack",
+
+  "gui.sophisticatedtab.settings.title": "Sophisticated Tab — Settings",
+  "gui.sophisticatedtab.settings.section.carried": "Currently Carried",
+  "gui.sophisticatedtab.settings.section.saved": "Saved but not carried",
+  "gui.sophisticatedtab.settings.toggleVisible": "Visible",
+  "gui.sophisticatedtab.settings.toggleHidden": "Hidden",
+  "gui.sophisticatedtab.settings.unknownBackpack": "Unknown backpack",
+  "gui.sophisticatedtab.settings.noUuid": "No identity yet — open this backpack once to assign one.",
+  "gui.sophisticatedtab.settings.resetOrder": "Reset Order",
+  "gui.sophisticatedtab.settings.resetHidden": "Reset Hidden",
+  "gui.sophisticatedtab.settings.cleanUnused": "Clean Unused",
+  "gui.sophisticatedtab.settings.confirm": "Confirm?",
+  "gui.sophisticatedtab.settings.done": "Done",
+  "gui.sophisticatedtab.settings.empty": "No backpacks carried.",
+
+  "key.categories.sophisticatedtab": "Sophisticated Tab",
+  "key.sophisticatedtab.openSettings": "Open Tab Settings"
 }

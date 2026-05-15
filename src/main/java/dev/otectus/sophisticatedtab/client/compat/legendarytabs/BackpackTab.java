@@ -57,9 +57,13 @@ public final class BackpackTab extends TabBase {
         this.index = index;
     }
 
-    private Optional<BackpackDescriptor> currentDescriptor(Player player) {
-        List<BackpackDescriptor> all = SophisticatedBackpacksLocator.findAllBackpacks(player);
-        return index < all.size() ? Optional.of(all.get(index)) : Optional.empty();
+    public int index() {
+        return index;
+    }
+
+    Optional<BackpackDescriptor> currentDescriptor(Player player) {
+        List<BackpackDescriptor> visible = BackpackTabResolver.visible(player);
+        return index < visible.size() ? Optional.of(visible.get(index)) : Optional.empty();
     }
 
     @Override

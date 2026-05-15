@@ -1,6 +1,7 @@
 package dev.otectus.sophisticatedtab.client.compat.legendarytabs;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
@@ -29,5 +30,12 @@ public record BackpackDescriptor(
             return Optional.empty();
         }
         return Optional.of(new BackpackDescriptor(handlerName, identifier, slot, stack, stack.getHoverName(), wrapper));
+    }
+
+    // Stable client-side identity. Empty for backpacks that haven't been opened
+    // and haven't had a contents UUID assigned yet — those are rendered but
+    // excluded from persistent hide/order state.
+    public Optional<UUID> uuid() {
+        return wrapper.getContentsUuid();
     }
 }

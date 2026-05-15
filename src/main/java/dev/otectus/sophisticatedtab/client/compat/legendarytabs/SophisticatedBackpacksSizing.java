@@ -15,17 +15,21 @@ public final class SophisticatedBackpacksSizing {
     private SophisticatedBackpacksSizing() {}
 
     public static int getWidth(Player player) {
-        return SophisticatedBackpacksLocator.findFirstBackpack(player)
-                .map(BackpackDescriptor::wrapper)
+        return firstVisibleWrapper(player)
                 .map(SophisticatedBackpacksSizing::computeWidth)
                 .orElse(VANILLA_INVENTORY_WIDTH);
     }
 
     public static int getHeight(Player player) {
-        return SophisticatedBackpacksLocator.findFirstBackpack(player)
-                .map(BackpackDescriptor::wrapper)
+        return firstVisibleWrapper(player)
                 .map(SophisticatedBackpacksSizing::computeHeight)
                 .orElse(VANILLA_INVENTORY_HEIGHT);
+    }
+
+    private static java.util.Optional<IBackpackWrapper> firstVisibleWrapper(Player player) {
+        return BackpackTabResolver.visible(player).stream()
+                .findFirst()
+                .map(BackpackDescriptor::wrapper);
     }
 
     private static int computeWidth(IBackpackWrapper wrapper) {

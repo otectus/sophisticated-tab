@@ -6,9 +6,38 @@ All notable changes to **Sophisticated Tab** are documented here. Format roughly
 
 ### Planned
 
-- **Optional config** to disable the return-to-inventory tab for users who prefer pressing `Esc` then re-opening the inventory.
 - **NeoForge 1.21.1 port** if upstream Legendary Tabs and Sophisticated Backpacks both publish 1.21.1 builds.
 - **Sub-backpack tabs** — enumerate nested backpacks (`BackpackContext$ItemSubBackpack`) instead of stopping at top-level only.
+
+## [1.20.1-0.5.0] - 2026-05-14
+
+### Added — User-configurable tab order, hiding, and settings
+
+- **Drag-and-drop tab ordering.** Left-click-hold and drag a backpack tab horizontally. The dragged backpack renders as a faded ghost at the cursor and a vertical drop indicator marks the target slot. Release commits the reorder; release without horizontal movement is treated as a normal click and opens the backpack. Threshold: 4 px / 350 ms (constants in [TabInteractionHandler.java](src/main/java/dev/otectus/sophisticatedtab/client/input/TabInteractionHandler.java)).
+- **Right-click context menu** on any backpack tab. Four entries: `Open Backpack`, `Move Left`, `Move Right`, `Hide This Backpack`. Move entries grey out at the row boundaries; hide greys out for UUID-less backpacks (see Design notes). Menu position auto-clamps when the anchor tab is at the right edge of the row.
+- **Hide individual backpacks** so they vanish from the LT row. Hidden backpacks remain in the inventory and are still openable via SB's default `B` keybind; only the tab is suppressed.
+- **Settings screen** (`BackpackSettingsScreen`) listing every currently carried backpack plus every saved-but-not-carried UUID. Click a carried row to toggle visibility; the screen is the **escape hatch** that prevents hiding every tab from trapping the user. Footer buttons: `Reset Order`, `Reset Hidden` (both two-step confirm), `Clean Unused` (one-shot prune of stale UUIDs), `Done`.
+- **Gear tab** on the LT row (priority 100) opens the settings screen. Reuses [backpack_tab.png](src/main/resources/assets/sophisticatedtab/textures/gui/backpack_tab.png) chrome and overlays a `Items.COMPARATOR` glyph so the iconography stays in line with the rest of the row.
+- **`Open Tab Settings` keybind** (default unbound — assign via `Options > Controls > Sophisticated Tab`). Opens the settings screen during gameplay without needing the inventory.
+- **Per-profile client preferences** persisted to `config/sophisticatedtab/tab_preferences.json`. Profile key is `singleplayer:<level>` for both non-LAN and LAN-hosted single-player; `server:<ip>` for multiplayer connections. Schema is v1, includes `orderedBackpacks` and `hiddenBackpacks` per profile. Atomic writes via temp+rename; corrupt files are renamed to `tab_preferences.json.broken.<ISO-timestamp>` on the next launch rather than overwritten in place.
+
+### Changed
+
+- **[BackpackTab.java](src/main/java/dev/otectus/sophisticatedtab/client/compat/legendarytabs/BackpackTab.java)** now resolves its descriptor through [BackpackTabResolver.java](src/main/java/dev/otectus/sophisticatedtab/client/compat/legendarytabs/BackpackTabResolver.java) instead of calling `SophisticatedBackpacksLocator.findAllBackpacks(player)` directly. The resolver applies the user's hide-filter and order-sort once and produces the canonical visible list that `BackpackTab(i)` indexes into.
+- **[BackpackDescriptor.java](src/main/java/dev/otectus/sophisticatedtab/client/compat/legendarytabs/BackpackDescriptor.java)** gains a `uuid()` accessor delegating to `wrapper.getContentsUuid()`. Centralizes identity reads so the resolver, preferences model, and active-tab highlight no longer each re-derive it.
+- **[SophisticatedBackpacksSizing.java](src/main/java/dev/otectus/sophisticatedtab/client/compat/legendarytabs/SophisticatedBackpacksSizing.java)** now sizes against the **first visible** backpack from the resolver instead of the first discovered. Matches what the user sees: the leftmost tab is the screen-sizing anchor even after reordering.
+- **[LegendaryTabsCompat.java](src/main/java/dev/otectus/sophisticatedtab/client/compat/legendarytabs/LegendaryTabsCompat.java)** exposes the registered `BackpackTab` instances via `backpackTabs()` so [TabInteractionHandler.java](src/main/java/dev/otectus/sophisticatedtab/client/input/TabInteractionHandler.java) can identify which `TabButton` on the active screen represents which logical index.
+
+### Design notes for future contributors
+
+- **Why UUID, not slot/tier/name, as the identity anchor?** Slot breaks on inventory rearrange. Tier breaks on multiple backpacks of the same tier (the common heavy-player case). Name breaks on rename and collides on identical names. `IStorageWrapper.getContentsUuid()` is stable across all three and was already the anchor for v0.3.0's active-tab highlight — v0.5.0 just extends it to ordering and hiding.
+- **Why no item NBT mutation for hide state?** Hiding is a local UI preference. Writing it to item NBT would: (a) travel with the backpack if traded, (b) require a server packet, (c) break shared worlds where multiple players see different "carrying" sets. Storing only in the client JSON keeps the contract clean.
+- **Why no dynamic LegendaryTabs tab re-registration?** `TabsMenu.register` is a one-shot at `FMLClientSetupEvent`. The static-pool-of-eight `BackpackTab` instances each resolve their descriptor at render/click time, so the perceived reorder happens entirely inside the resolver — LT priorities `20..27` never mutate.
+- **UUID-less backpacks** (rare; happens on freshly crafted stacks before SB writes the contents UUID) render normally but are excluded from drag-ordering and from `hide` persistence. The context menu greys those entries out, and the settings screen marks them with a `*` and a tooltip explaining the limitation. If the UUID is assigned later (e.g., on first open), the backpack rejoins the configurable pool automatically.
+- **Right-click capture vs. LT's `Button.onPress`.** LT's `TabButton` extends `Button` and treats all mouse buttons identically — `onPress` fires for left, right, and middle clicks the same way. To distinguish right-click without forking LT, [TabInteractionHandler.java](src/main/java/dev/otectus/sophisticatedtab/client/input/TabInteractionHandler.java) subscribes to `ScreenEvent.MouseButtonPressed.Pre` at `EventPriority.HIGH` and cancels the event before LT's widget dispatch runs. Left-clicks on our tabs are also captured so we can decide click-vs-drag on `MouseButtonReleased.Pre`.
+- **TabButton.tabBase field access.** LegendaryTabs 1.20.1 exposes the field as `public TabBase tabBase`. The hit-test reads it directly; if a future LT release flips it to private, the read is wrapped in try/catch and degrades to a logged warning rather than crashing.
+- **Drag visual via `ScreenEvent.Render.Post`.** We don't move the live `TabButton` widgets — they stay rendered at their priority-determined positions. The drag is purely a top-level overlay: faded ghost ItemStack at the cursor plus a 2 px white drop indicator between the nearest tab boundaries.
+- **Preferences scope.** Per-world for singleplayer (including LAN-hosted, which uses the same `singleplayer:<level>` key as non-LAN) and per-server for multiplayer. Cross-instance share isn't supported — each launcher profile has its own `config/sophisticatedtab/`.
 
 ## [1.20.1-0.3.0] - 2026-05-11
 

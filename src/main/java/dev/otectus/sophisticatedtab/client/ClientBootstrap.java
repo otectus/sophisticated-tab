@@ -1,6 +1,12 @@
 package dev.otectus.sophisticatedtab.client;
 
 import dev.otectus.sophisticatedtab.client.compat.legendarytabs.LegendaryTabsCompat;
+import dev.otectus.sophisticatedtab.client.input.KeyBindings;
+import dev.otectus.sophisticatedtab.client.input.TabInteractionHandler;
+import dev.otectus.sophisticatedtab.client.prefs.PreferencesStorage;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import org.slf4j.Logger;
@@ -24,6 +30,22 @@ public final class ClientBootstrap {
             return;
         }
 
-        event.enqueueWork(LegendaryTabsCompat::register);
+        event.enqueueWork(() -> {
+            PreferencesStorage.loadAll();
+            LegendaryTabsCompat.register();
+        });
+
+        MinecraftForge.EVENT_BUS.register(ClientBootstrap.class);
+        MinecraftForge.EVENT_BUS.register(TabInteractionHandler.class);
+    }
+
+    // Flush pending preference writes at most once per tick. Mutations mark the
+    // model dirty; this drains the flag on the client thread so all I/O stays
+    // off the render path.
+    @SubscribeEvent
+    public static void onClientTick(TickEvent.ClientTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) return;
+        PreferencesStorage.flushIfDirty();
+        KeyBindings.pollSettingsKey();
     }
 }
