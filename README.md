@@ -18,6 +18,11 @@ Backpacks are discovered through Sophisticated Backpacks' `PlayerInventoryProvid
 - **Settings keybind.** `Options > Controls > Sophisticated Tab > Open Tab Settings` (default unbound) opens the settings screen from gameplay without needing the inventory.
 - **Persistent.** Order and hide state save to `config/sophisticatedtab/tab_preferences.json`, scoped per world (singleplayer, including LAN-hosted) or per server (multiplayer). UUID is the identity key, so renaming, dyeing, or moving a backpack between slots all preserve the user's choices.
 
+### Stability and per-(world × player) scope hardening (v0.6.0)
+
+- **Visual ghost-item fix.** Tab opens (and the right-click `Open Backpack` action) now route through a `BackpackOpenCoordinator` that closes the previous container cleanly before opening the backpack. v0.5.x sent `BackpackOpenMessage` directly while `InventoryScreen` was active; vanilla's `ServerPlayer.openMenu` short-circuited its own close call in that case, leaving crafting input and the carried stack stranded server-side. The new flow fires `LocalPlayer.closeContainer()` (server returns the crafting input + cursor), defers one client tick, and re-resolves the target backpack by UUID before sending the open message. Back-to-inventory tab gets the same close-first treatment, eliminating a latent desync where the server kept the backpack menu open while the client rendered `InventoryScreen`.
+- **Cross-world preferences leak fix.** Preference profile keys now scope by **world save folder + player UUID** (was: display name only). Two worlds named the same don't share preferences, and different Mojang accounts on the same machine don't inherit each other's hide/order state. `tab_preferences.json` is silently migrated from schema v1 to v2 on first launch — old entries are preserved under a `legacy/` prefix but never read, so nothing is deleted and nothing leaks.
+
 The mod does **not** add a vanilla creative inventory category. Sophisticated Backpacks already registers one; duplicating it would be noise.
 
 ## Requirements
@@ -69,7 +74,8 @@ src/main/java/dev/otectus/sophisticatedtab/
    ├─ ClientBootstrap.java             # FMLClientSetupEvent → load checks → register handlers
    ├─ compat/legendarytabs/
    │  ├─ LegendaryTabsCompat.java      # TabsMenu.register bridge (isolates LT class refs)
-   │  ├─ BackpackDescriptor.java       # immutable (handlerName, identifier, slot, iconStack, tooltip, wrapper) + uuid()
+   │  ├─ BackpackDescriptor.java       # immutable record; iconStack is a defensive copy of the live inventory stack
+   │  ├─ BackpackOpenCoordinator.java  # routes tab opens / back-to-inventory through close-then-defer-then-open
    │  ├─ BackpackTab.java              # indexed TabBase — one per pool slot, resolves descriptor at render time
    │  ├─ BackpackTabResolver.java      # discovery → filter hidden → sort by preference (per call)
    │  ├─ BackToInventoryTab.java       # tab attached to BackpackScreen that returns to InventoryScreen
@@ -77,9 +83,10 @@ src/main/java/dev/otectus/sophisticatedtab/
    │  ├─ SophisticatedBackpacksLocator.java
    │  └─ SophisticatedBackpacksSizing.java
    ├─ prefs/
-   │  ├─ BackpackTabPreferences.java   # in-memory model: ordered/hidden UUIDs per profile
-   │  ├─ PreferencesStorage.java       # atomic JSON load/save under config/sophisticatedtab/
-   │  └─ ProfileResolver.java          # singleplayer:<level> | server:<ip> | unknown
+   │  ├─ BackpackTabPreferences.java   # in-memory model: ordered/hidden UUIDs per profile (schema v2)
+   │  ├─ PreferencesStorage.java       # atomic JSON load/save under config/sophisticatedtab/; v1→v2 migration
+   │  ├─ ProfileResolver.java          # v2:sp/<folder>/<uuid> | v2:mp/<host:port>/<uuid> | v2:unknown (ephemeral)
+   │  └─ BackpackScopeKey.java         # structured scope key (Kind + identity + player UUID)
    ├─ input/
    │  ├─ TabInteractionHandler.java    # ScreenEvent.* listener — right-click menu, click vs drag, drop indicator
    │  └─ KeyBindings.java              # RegisterKeyMappingsEvent + ClientTickEvent polling
