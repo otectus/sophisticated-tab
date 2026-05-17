@@ -12,22 +12,36 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-// In-memory preference model. Holds one ProfileEntry per (world | server) key.
+// In-memory preference model. Holds one ProfileEntry per scope key.
 // Mutations mark the global dirty flag; PreferencesStorage owns the actual I/O.
 // All access is single-threaded (client thread).
+//
+// SCHEMA_VERSION 2 (2026-05): keys are produced by BackpackScopeKey
+// (v2:sp/<folder>/<uuid> or v2:mp/<host:port>/<uuid>). v1 keys (display-name
+// based) were vulnerable to cross-world leakage and are migrated under
+// "legacy/" by PreferencesStorage on first load.
 public final class BackpackTabPreferences {
 
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
 
     private static final Map<String, ProfileEntry> PROFILES = new HashMap<>();
     private static final AtomicBoolean DIRTY = new AtomicBoolean(false);
+
+    // Sentinel returned by current() when scope is UNKNOWN (no player, no
+    // server). Reads return empty collections; all mutators no-op so we don't
+    // accumulate session-wide garbage that gets flushed under a global key.
+    private static final ProfileEntry EPHEMERAL_PROFILE = new ProfileEntry(true);
 
     private BackpackTabPreferences() {}
 
     // ----- Profile registry ---------------------------------------------------
 
     public static ProfileEntry current() {
-        return profile(ProfileResolver.activeProfile());
+        BackpackScopeKey key = ProfileResolver.activeScope();
+        if (!key.isPersistent()) {
+            return EPHEMERAL_PROFILE;
+        }
+        return profile(key.toStorageKey());
     }
 
     public static ProfileEntry profile(String key) {
@@ -55,8 +69,19 @@ public final class BackpackTabPreferences {
     // ----- ProfileEntry -------------------------------------------------------
 
     public static final class ProfileEntry {
+        private final boolean ephemeral;
         private final List<UUID> orderedBackpacks = new ArrayList<>();
         private final Set<UUID> hiddenBackpacks = new LinkedHashSet<>();
+
+        public ProfileEntry() {
+            this(false);
+        }
+
+        // Ephemeral entries (used for UNKNOWN scope) skip all mutations and are
+        // never registered in PROFILES, so they can't pollute the persisted file.
+        private ProfileEntry(boolean ephemeral) {
+            this.ephemeral = ephemeral;
+        }
 
         public List<UUID> orderedBackpacks() {
             return orderedBackpacks;
@@ -71,14 +96,14 @@ public final class BackpackTabPreferences {
         }
 
         public void hide(UUID id) {
-            if (id == null) return;
+            if (id == null || ephemeral) return;
             if (hiddenBackpacks.add(id)) {
                 markDirty();
             }
         }
 
         public void unhide(UUID id) {
-            if (id == null) return;
+            if (id == null || ephemeral) return;
             if (hiddenBackpacks.remove(id)) {
                 markDirty();
             }
@@ -87,7 +112,7 @@ public final class BackpackTabPreferences {
         // Shift a UUID's position in orderedBackpacks by `delta` slots, clamped.
         // If the UUID isn't present yet it's first appended at the end, then shifted.
         public void move(UUID id, int delta) {
-            if (id == null || delta == 0) return;
+            if (id == null || delta == 0 || ephemeral) return;
             int current = orderedBackpacks.indexOf(id);
             if (current < 0) {
                 orderedBackpacks.add(id);
@@ -105,7 +130,7 @@ public final class BackpackTabPreferences {
         // snapshot, then merge into orderedBackpacks. Off-screen UUIDs (saved but
         // not currently carried) retain relative order at the tail.
         public void reorder(UUID moving, int targetVisibleIndex, List<UUID> currentVisibleUuids) {
-            if (moving == null || currentVisibleUuids == null) return;
+            if (moving == null || currentVisibleUuids == null || ephemeral) return;
             List<UUID> proposed = new ArrayList<>(currentVisibleUuids);
             proposed.remove(moving);
             int idx = Math.max(0, Math.min(proposed.size(), targetVisibleIndex));
@@ -124,18 +149,19 @@ public final class BackpackTabPreferences {
         }
 
         public void resetOrder() {
-            if (orderedBackpacks.isEmpty()) return;
+            if (orderedBackpacks.isEmpty() || ephemeral) return;
             orderedBackpacks.clear();
             markDirty();
         }
 
         public void resetHidden() {
-            if (hiddenBackpacks.isEmpty()) return;
+            if (hiddenBackpacks.isEmpty() || ephemeral) return;
             hiddenBackpacks.clear();
             markDirty();
         }
 
         public void cleanUnused(Collection<UUID> currentlyCarried) {
+            if (ephemeral) return;
             boolean changed = orderedBackpacks.retainAll(currentlyCarried);
             changed |= hiddenBackpacks.retainAll(currentlyCarried);
             if (changed) {

@@ -1,9 +1,11 @@
 package dev.otectus.sophisticatedtab.client;
 
+import dev.otectus.sophisticatedtab.client.compat.legendarytabs.BackpackOpenCoordinator;
 import dev.otectus.sophisticatedtab.client.compat.legendarytabs.LegendaryTabsCompat;
 import dev.otectus.sophisticatedtab.client.input.KeyBindings;
 import dev.otectus.sophisticatedtab.client.input.TabInteractionHandler;
 import dev.otectus.sophisticatedtab.client.prefs.PreferencesStorage;
+import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -47,5 +49,16 @@ public final class ClientBootstrap {
         if (event.phase != TickEvent.Phase.END) return;
         PreferencesStorage.flushIfDirty();
         KeyBindings.pollSettingsKey();
+        BackpackOpenCoordinator.tick();
+    }
+
+    // Guarantees a flush at the moment the player leaves the world / server,
+    // before the next world's scope key could overwrite the dirty flag's
+    // semantics. Doesn't clear the in-memory PROFILES cache — each
+    // BackpackTabPreferences.current() call re-resolves the scope key, so
+    // entries from other scopes remain inert but cheaply available on return.
+    @SubscribeEvent
+    public static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
+        PreferencesStorage.flushIfDirty();
     }
 }

@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import dev.otectus.sophisticatedtab.client.compat.legendarytabs.BackpackDescriptor;
+import dev.otectus.sophisticatedtab.client.compat.legendarytabs.BackpackOpenCoordinator;
 import dev.otectus.sophisticatedtab.client.prefs.BackpackTabPreferences;
 import dev.otectus.sophisticatedtab.client.prefs.BackpackTabPreferences.ProfileEntry;
 import net.minecraft.client.Minecraft;
@@ -12,8 +13,6 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.p3pp3rf1y.sophisticatedbackpacks.network.BackpackOpenMessage;
-import net.p3pp3rf1y.sophisticatedbackpacks.network.SBPPacketHandler;
 
 // Tiny floating popup anchored under the right-clicked backpack tab. Renders
 // the parent inventory/backpack screen as a dimmed background and presents
@@ -133,10 +132,10 @@ public final class BackpackTabContextMenu extends Screen {
     }
 
     private void openBackpack() {
-        SBPPacketHandler.INSTANCE.sendToServer(
-                new BackpackOpenMessage(target.slot(), target.identifier(), target.handlerName()));
-        // The server will respond by opening BackpackScreen; the resulting setScreen
-        // replaces this menu naturally.
+        // Coordinator handles close-then-open sequencing if the parent inventory
+        // has stranded crafting / carried state. Otherwise it fast-paths the
+        // packet send. The eventual BackpackScreen replaces this menu.
+        BackpackOpenCoordinator.openBackpackFromTab(target);
     }
 
     private static boolean canMove(ProfileEntry prefs, UUID id, int delta) {

@@ -29,7 +29,12 @@ public record BackpackDescriptor(
         if (wrapper == null) {
             return Optional.empty();
         }
-        return Optional.of(new BackpackDescriptor(handlerName, identifier, slot, stack, stack.getHoverName(), wrapper));
+        // Defensive copy. The original stack is a live reference to a slot in
+        // the player's inventory; the tab renders this every frame, and an
+        // inventory mutation mid-render (e.g. close-then-open cleanup returning
+        // crafting input) could otherwise be observable in the icon.
+        ItemStack iconStack = stack.copy();
+        return Optional.of(new BackpackDescriptor(handlerName, identifier, slot, iconStack, iconStack.getHoverName(), wrapper));
     }
 
     // Stable client-side identity. Empty for backpacks that haven't been opened

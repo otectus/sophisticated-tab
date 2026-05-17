@@ -1,6 +1,5 @@
 package dev.otectus.sophisticatedtab.client.compat.legendarytabs;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
@@ -31,7 +30,11 @@ public final class BackToInventoryTab extends TabBase {
 
     @Override
     public void openTargetScreen(Player player) {
-        Minecraft.getInstance().setScreen(new InventoryScreen(player));
+        // Closing the BackpackContainer via the vanilla path first tells the
+        // server the menu is gone (otherwise it stays "open" server-side while
+        // the client renders InventoryScreen → guaranteed desync on next click).
+        // The deferred setScreen runs on the next client tick.
+        BackpackOpenCoordinator.openInventoryFromBackpack(player);
     }
 
     @Override

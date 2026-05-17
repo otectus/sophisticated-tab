@@ -22,6 +22,9 @@ run-data/
 # Forge
 src/generated/resources/.cache/
 forge-*-changelog.txt
+# ForgeGradle occasionally drops reobf class outputs in a top-level net/
+# directory when a build is interrupted mid-reobf.
+/net/
 
 # Local IDE workspace artifacts
 *.bak

@@ -16,8 +16,6 @@ import net.p3pp3rf1y.sophisticatedbackpacks.backpack.wrapper.IBackpackWrapper;
 import net.p3pp3rf1y.sophisticatedbackpacks.client.gui.BackpackScreen;
 import net.p3pp3rf1y.sophisticatedbackpacks.common.gui.BackpackContainer;
 import net.p3pp3rf1y.sophisticatedbackpacks.common.gui.BackpackContext;
-import net.p3pp3rf1y.sophisticatedbackpacks.network.BackpackOpenMessage;
-import net.p3pp3rf1y.sophisticatedbackpacks.network.SBPPacketHandler;
 import sfiomn.legendarytabs.api.tabs_menu.TabBase;
 import sfiomn.legendarytabs.api.tabs_menu.TabsMenu;
 
@@ -73,9 +71,7 @@ public final class BackpackTab extends TabBase {
 
     @Override
     public void openTargetScreen(Player player) {
-        currentDescriptor(player).ifPresent(desc ->
-                SBPPacketHandler.INSTANCE.sendToServer(
-                        new BackpackOpenMessage(desc.slot(), desc.identifier(), desc.handlerName())));
+        currentDescriptor(player).ifPresent(BackpackOpenCoordinator::openBackpackFromTab);
     }
 
     @Override

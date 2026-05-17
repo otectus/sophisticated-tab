@@ -55,9 +55,17 @@ public final class PreferencesStorage {
         }
         try (Reader r = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
             JsonElement root = JsonParser.parseReader(r);
-            Map<String, ProfileEntry> parsed = parse(root);
-            BackpackTabPreferences.replaceAll(parsed);
-            LOG.info("Loaded {} profile(s) from {}.", parsed.size(), path);
+            ParseResult result = parse(root);
+            BackpackTabPreferences.replaceAll(result.profiles());
+            if (result.migrated()) {
+                // Force a rewrite at the new schema so the migrated keys (and
+                // version bump) hit disk on the next tick.
+                BackpackTabPreferences.markDirty();
+                LOG.info("Migrated {} legacy profile(s) from {}; will rewrite at v{}.",
+                        result.profiles().size(), path, BackpackTabPreferences.SCHEMA_VERSION);
+            } else {
+                LOG.info("Loaded {} profile(s) from {}.", result.profiles().size(), path);
+            }
         } catch (JsonSyntaxException | IOException | IllegalStateException e) {
             LOG.warn("Failed to parse {}: {}. Renaming and starting fresh.", path, e.getMessage());
             quarantine(path);
@@ -91,10 +99,15 @@ public final class PreferencesStorage {
 
     // ----- parsing ------------------------------------------------------------
 
-    static Map<String, ProfileEntry> parse(JsonElement root) {
+    // Result of parsing: the loaded profiles plus a flag indicating whether
+    // any v1 keys were migrated to the legacy/ prefix (and thus the file
+    // should be rewritten at the new schema version).
+    record ParseResult(Map<String, ProfileEntry> profiles, boolean migrated) {}
+
+    static ParseResult parse(JsonElement root) {
         Map<String, ProfileEntry> out = new HashMap<>();
         if (root == null || !root.isJsonObject()) {
-            return out;
+            return new ParseResult(out, false);
         }
         JsonObject obj = root.getAsJsonObject();
         int version = obj.has("version") && obj.get("version").isJsonPrimitive()
@@ -104,17 +117,34 @@ public final class PreferencesStorage {
                     version, BackpackTabPreferences.SCHEMA_VERSION);
         }
         if (!obj.has("profiles") || !obj.get("profiles").isJsonObject()) {
-            return out;
+            return new ParseResult(out, false);
         }
+        // v1 keyed by display-name (e.g. "singleplayer:NewWorld"); those collide
+        // across worlds with the same display name and leaked stale UUIDs into
+        // freshly created worlds. Move them under "legacy/" so they're inert
+        // from now on (preserved on disk for archeology, never read by current()).
+        boolean migrating = version < BackpackTabPreferences.SCHEMA_VERSION;
+        boolean migrated = false;
         for (Map.Entry<String, JsonElement> e : obj.getAsJsonObject("profiles").entrySet()) {
             if (!e.getValue().isJsonObject()) continue;
+            String key = e.getKey();
+            if (BackpackScopeKey.UNKNOWN.toStorageKey().equals(key)) {
+                // Belt-and-suspenders: an ephemeral scope key should never be on
+                // disk, but if a malformed write or manual edit put one there,
+                // drop it on load so it can't propagate.
+                continue;
+            }
+            if (migrating && !key.startsWith("legacy/")) {
+                key = "legacy/" + key;
+                migrated = true;
+            }
             ProfileEntry entry = new ProfileEntry();
             JsonObject p = e.getValue().getAsJsonObject();
             readUuids(p, "orderedBackpacks").forEach(entry.orderedBackpacks()::add);
             readUuids(p, "hiddenBackpacks").forEach(entry.hiddenBackpacks()::add);
-            out.put(e.getKey(), entry);
+            out.put(key, entry);
         }
-        return out;
+        return new ParseResult(out, migrated);
     }
 
     private static List<UUID> readUuids(JsonObject parent, String key) {
