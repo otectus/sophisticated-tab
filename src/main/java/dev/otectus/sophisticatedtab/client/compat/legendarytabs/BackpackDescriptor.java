@@ -5,7 +5,7 @@ import java.util.UUID;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
-import net.p3pp3rf1y.sophisticatedbackpacks.api.CapabilityBackpackWrapper;
+import net.p3pp3rf1y.sophisticatedbackpacks.backpack.wrapper.BackpackWrapper;
 import net.p3pp3rf1y.sophisticatedbackpacks.backpack.wrapper.IBackpackWrapper;
 
 // Immutable view of one backpack in the player's inventory: where it lives
@@ -24,8 +24,9 @@ public record BackpackDescriptor(
         if (stack == null || stack.isEmpty()) {
             return Optional.empty();
         }
-        IBackpackWrapper wrapper = stack.getCapability(CapabilityBackpackWrapper.BACKPACK_WRAPPER_CAPABILITY)
-                .orElse(null);
+        // 1.21.1 replaced the Forge capability lookup with a static helper that
+        // returns the wrapper directly (or a no-op wrapper for non-backpack stacks).
+        IBackpackWrapper wrapper = BackpackWrapper.fromStack(stack);
         if (wrapper == null) {
             return Optional.empty();
         }

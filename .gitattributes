@@ -1,0 +1,7 @@
+# Normalize line endings to LF in the repository. The 1.21.1 port sources were copied
+# from a working tree that had CRLF churn; this keeps committed blobs LF-only.
+* text=auto eol=lf
+
+# Binary assets — never touch.
+*.png binary
+*.jar binary

@@ -7,9 +7,8 @@ import java.util.UUID;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import dev.otectus.sophisticatedtab.client.compat.legendarytabs.BackpackDescriptor;
+import dev.otectus.sophisticatedtab.client.compat.legendarytabs.BackpackOpenCoordinator;
 import dev.otectus.sophisticatedtab.client.compat.legendarytabs.BackpackTab;
-import dev.otectus.sophisticatedtab.client.compat.legendarytabs.BackpackTabResolver;
-import dev.otectus.sophisticatedtab.client.compat.legendarytabs.LegendaryTabsCompat;
 import dev.otectus.sophisticatedtab.client.gui.BackpackTabContextMenu;
 import dev.otectus.sophisticatedtab.client.prefs.BackpackTabPreferences;
 import dev.otectus.sophisticatedtab.client.prefs.BackpackTabPreferences.ProfileEntry;
@@ -18,15 +17,16 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.world.entity.player.Player;
-import net.minecraftforge.client.event.ScreenEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.neoforged.bus.api.EventPriority;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.client.event.ScreenEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sfiomn.legendarytabs.api.tabs_menu.TabBase;
-import sfiomn.legendarytabs.client.screens.TabButton;
+import vodmordia.modtabs.api.tabs_menu.TabBase;
+import vodmordia.modtabs.api.tabs_menu.TabsMenu;
+import vodmordia.modtabs.client.screens.TabButton;
 
-// Forge-bus listener that routes mouse activity over our backpack tabs.
+// Game-bus listener that routes mouse activity over our backpack tabs.
 //
 // Right-click on a backpack tab opens BackpackTabContextMenu.
 // Left-click is captured as either:
@@ -34,8 +34,12 @@ import sfiomn.legendarytabs.client.screens.TabButton;
 //   - a "drag" (release after horizontal motion past DRAG_THRESHOLD) -> reorders
 //     the UUID via BackpackTabPreferences#reorder.
 //
-// State is global because Forge events are static-handler-friendly and the user
-// can only have one active gesture at a time on the client.
+// Mod Tabs creates a fresh BackpackTab per visible backpack each screen-init, so we read
+// the live on-screen TabButtons (whose tabBase is a BackpackTab) rather than a static
+// pool. After a reorder we ask Mod Tabs to rebuild the bar so the new order shows.
+//
+// State is global because the events are static-handler-friendly and the user can only
+// have one active gesture at a time on the client.
 public final class TabInteractionHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger("sophisticatedtab/input");
@@ -54,7 +58,9 @@ public final class TabInteractionHandler {
 
     private static State state = State.IDLE;
     private static Screen activeScreen;
-    private static int armedIndex = -1;
+    private static UUID armedUuid;
+    private static BackpackDescriptor armedDescriptor;
+    private static int armedSlotIndex = -1;
     private static double pressX;
     private static double pressY;
     private static long pressTimeMs;
@@ -99,7 +105,7 @@ public final class TabInteractionHandler {
             long elapsed = System.currentTimeMillis() - pressTimeMs;
             double dist = Math.abs(mx - pressX);
             if (dist < DRAG_THRESHOLD && elapsed < CLICK_TIME_MS) {
-                openBackpackAt(armedIndex);
+                openArmedBackpack();
                 cancel = true;
             }
         } else if (state == State.DRAGGING) {
@@ -147,18 +153,11 @@ public final class TabInteractionHandler {
         if (hit.isEmpty()) {
             return;
         }
-        Player player = Minecraft.getInstance().player;
-        if (player == null) {
-            return;
-        }
-        Optional<BackpackDescriptor> desc = descriptorFor(player, hit.get().backpackTab().index());
-        if (desc.isEmpty()) {
-            return;
-        }
+        BackpackDescriptor desc = hit.get().tab().descriptor();
         event.setCanceled(true);
         resetState();
         Minecraft.getInstance().setScreen(
-                new BackpackTabContextMenu(screen, desc.get(), hit.get().anchorX(), hit.get().anchorY()));
+                new BackpackTabContextMenu(screen, desc, hit.get().anchorX(), hit.get().anchorY()));
     }
 
     private static void handleLeftPress(ScreenEvent.MouseButtonPressed.Pre event,
@@ -170,78 +169,89 @@ public final class TabInteractionHandler {
         if (hit.isEmpty()) {
             return;
         }
-        Player player = Minecraft.getInstance().player;
-        if (player == null) {
+        if (Minecraft.getInstance().player == null) {
             return;
         }
 
-        // Snapshot visible UUIDs at press time. The reorder math relies on the
-        // ordering not shifting underneath us during the gesture.
-        List<BackpackDescriptor> visible = BackpackTabResolver.visible(player);
-        int idx = hit.get().backpackTab().index();
-        if (idx >= visible.size()) {
-            return;
+        BackpackDescriptor desc = hit.get().tab().descriptor();
+        UUID uuid = desc.uuid().orElse(null);
+
+        // Snapshot the on-screen backpack tabs (sorted left-to-right) at press time. The
+        // reorder math relies on the ordering not shifting underneath us during the gesture.
+        List<TabSlot> slots = snapshotSlots(screen);
+        List<UUID> uuids = new ArrayList<>(slots.size());
+        for (TabSlot s : slots) {
+            uuids.add(s.uuid());
         }
-        List<UUID> uuids = new ArrayList<>(visible.size());
-        for (BackpackDescriptor d : visible) {
-            uuids.add(d.uuid().orElse(null));
-        }
-        // Disallow dragging tabs whose backpack has no UUID — there is nothing
-        // stable to persist. Pure left-click still opens it via the normal LT path.
-        if (uuids.get(idx) == null) {
+
+        // Disallow dragging tabs whose backpack has no UUID — there is nothing stable to
+        // persist. Pure left-click still opens it via the normal path.
+        if (uuid == null) {
+            // Still arm so a plain click opens it; just mark it undraggable.
+            state = State.ARMED;
+            activeScreen = screen;
+            armedUuid = null;
+            armedDescriptor = desc;
+            armedSlotIndex = -1;
+            pressX = mx;
+            pressY = my;
+            pressTimeMs = System.currentTimeMillis();
+            visibleSnapshot = uuids;
+            slotSnapshot = slots;
+            event.setCanceled(true);
             return;
         }
 
         state = State.ARMED;
         activeScreen = screen;
-        armedIndex = idx;
+        armedUuid = uuid;
+        armedDescriptor = desc;
+        armedSlotIndex = uuids.indexOf(uuid);
         pressX = mx;
         pressY = my;
         pressTimeMs = System.currentTimeMillis();
         visibleSnapshot = uuids;
-        slotSnapshot = snapshotSlots(screen);
+        slotSnapshot = slots;
 
         event.setCanceled(true);
     }
 
-    private static void openBackpackAt(int idx) {
-        Player player = Minecraft.getInstance().player;
-        if (player == null) return;
-        List<BackpackTab> tabs = LegendaryTabsCompat.backpackTabs();
-        if (idx < 0 || idx >= tabs.size()) return;
-        tabs.get(idx).openTargetScreen(player);
+    private static void openArmedBackpack() {
+        if (armedDescriptor != null) {
+            BackpackOpenCoordinator.openBackpackFromTab(armedDescriptor);
+        }
     }
 
     private static void commitDrop(double dropX) {
-        UUID moving = visibleSnapshot.get(armedIndex);
-        if (moving == null) return;
+        if (armedUuid == null) {
+            return;
+        }
         int target = dropIndexFor(dropX);
-        if (target == armedIndex) return;
+        if (target == armedSlotIndex) {
+            return;
+        }
 
-        // Translate slot-index drop to a visible-list index. The slot list is in
-        // the same order as visibleSnapshot up to slotSnapshot.size().
         int clamped = Math.max(0, Math.min(visibleSnapshot.size() - 1, target));
         ProfileEntry prefs = BackpackTabPreferences.current();
-        prefs.reorder(moving, clamped, visibleSnapshot);
-        LOG.debug("Reordered {} to visible index {}", moving, clamped);
+        prefs.reorder(armedUuid, clamped, visibleSnapshot);
+        LOG.debug("Reordered {} to visible index {}", armedUuid, clamped);
+        // We stay on the same screen, so the tab bar will not rebuild on its own —
+        // ask Mod Tabs to reinitialize it so the new order is reflected immediately.
+        TabsMenu.reinitCurrentScreen();
     }
 
     // ===== rendering =========================================================
 
     private static void renderDragOverlay(GuiGraphics gui, double mx, double my) {
-        if (armedIndex < 0 || armedIndex >= visibleSnapshot.size()) return;
-        Player player = Minecraft.getInstance().player;
-        if (player == null) return;
-        List<BackpackDescriptor> visible = BackpackTabResolver.visible(player);
-        if (armedIndex >= visible.size()) return;
-
-        BackpackDescriptor desc = visible.get(armedIndex);
+        if (armedDescriptor == null) {
+            return;
+        }
 
         // Ghost icon — semi-transparent copy of the dragged backpack at the cursor.
         gui.pose().pushPose();
         gui.pose().translate(0, 0, 200);
         RenderSystem.setShaderColor(1f, 1f, 1f, 0.6f);
-        gui.renderItem(desc.iconStack(), (int) mx - 8, (int) my - 8);
+        gui.renderItem(armedDescriptor.iconStack(), (int) mx - 8, (int) my - 8);
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
         gui.pose().popPose();
 
@@ -270,21 +280,16 @@ public final class TabInteractionHandler {
             }
             gui.fill(boundaryX, top, boundaryX + DROP_INDICATOR_WIDTH, bottom, DROP_INDICATOR_COLOR);
         }
-
     }
 
     // ===== hit-test ==========================================================
 
-    public record TabHit(BackpackTab backpackTab, TabButton button, int anchorX, int anchorY) {}
+    public record TabHit(BackpackTab tab, TabButton button, int anchorX, int anchorY) {}
 
-    public record TabSlot(int index, int x, int y, int width, int height) {}
+    public record TabSlot(UUID uuid, int x, int y, int width, int height) {}
 
     public static Optional<TabHit> hitTest(Screen screen, double mouseX, double mouseY) {
         if (screen == null) {
-            return Optional.empty();
-        }
-        List<BackpackTab> ours = LegendaryTabsCompat.backpackTabs();
-        if (ours.isEmpty()) {
             return Optional.empty();
         }
         for (GuiEventListener child : screen.children()) {
@@ -292,15 +297,11 @@ public final class TabInteractionHandler {
                 continue;
             }
             TabBase underlying = readTabBase(button);
-            if (underlying == null) {
-                continue;
-            }
-            BackpackTab match = findMatchingBackpackTab(ours, underlying);
-            if (match == null) {
+            if (!(underlying instanceof BackpackTab backpackTab)) {
                 continue;
             }
             if (within(button, mouseX, mouseY)) {
-                return Optional.of(new TabHit(match, button,
+                return Optional.of(new TabHit(backpackTab, button,
                         button.getX(), button.getY() + button.getHeight()));
             }
         }
@@ -309,28 +310,16 @@ public final class TabInteractionHandler {
 
     static List<TabSlot> snapshotSlots(Screen screen) {
         if (screen == null) return List.of();
-        List<BackpackTab> ours = LegendaryTabsCompat.backpackTabs();
-        if (ours.isEmpty()) return List.of();
         List<TabSlot> slots = new ArrayList<>();
         for (GuiEventListener child : screen.children()) {
             if (!(child instanceof TabButton button)) continue;
             TabBase underlying = readTabBase(button);
-            if (underlying == null) continue;
-            BackpackTab match = findMatchingBackpackTab(ours, underlying);
-            if (match == null) continue;
-            slots.add(new TabSlot(match.index(), button.getX(), button.getY(),
-                    button.getWidth(), button.getHeight()));
+            if (!(underlying instanceof BackpackTab backpackTab)) continue;
+            slots.add(new TabSlot(backpackTab.descriptor().uuid().orElse(null),
+                    button.getX(), button.getY(), button.getWidth(), button.getHeight()));
         }
         slots.sort((a, b) -> Integer.compare(a.x(), b.x()));
         return slots;
-    }
-
-    static Optional<BackpackDescriptor> descriptorFor(Player player, int index) {
-        List<BackpackDescriptor> visible = BackpackTabResolver.visible(player);
-        if (index < 0 || index >= visible.size()) {
-            return Optional.empty();
-        }
-        return Optional.of(visible.get(index));
     }
 
     private static int dropIndexFor(double mouseX) {
@@ -352,16 +341,7 @@ public final class TabInteractionHandler {
                 && mouseY >= y && mouseY < y + b.getHeight();
     }
 
-    private static BackpackTab findMatchingBackpackTab(List<BackpackTab> ours, TabBase target) {
-        for (BackpackTab t : ours) {
-            if (t == target) {
-                return t;
-            }
-        }
-        return null;
-    }
-
-    // Try the documented public field first; if a future LT release ever flips
+    // Try the documented public field first; if a future Mod Tabs release ever flips
     // it to private with a getter, we degrade quietly rather than crash.
     private static TabBase readTabBase(TabButton button) {
         try {
@@ -375,7 +355,9 @@ public final class TabInteractionHandler {
     private static void resetState() {
         state = State.IDLE;
         activeScreen = null;
-        armedIndex = -1;
+        armedUuid = null;
+        armedDescriptor = null;
+        armedSlotIndex = -1;
         visibleSnapshot = List.of();
         slotSnapshot = List.of();
     }

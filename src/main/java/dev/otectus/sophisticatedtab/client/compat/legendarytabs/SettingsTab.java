@@ -4,34 +4,26 @@ import dev.otectus.sophisticatedtab.client.gui.BackpackSettingsScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.p3pp3rf1y.sophisticatedbackpacks.client.gui.BackpackScreen;
-import sfiomn.legendarytabs.api.tabs_menu.TabBase;
-import sfiomn.legendarytabs.api.tabs_menu.TabsMenu;
+import vodmordia.modtabs.api.tabs_menu.TabBase;
 
-// LT row tab that opens the v0.5.0 settings screen. Reuses the backpack tab
-// chrome and overlays a comparator ItemStack as the "settings" glyph — keeps
-// the iconography in line with the rest of the row (real items, not flat icons).
+// Mod Tabs row tab that opens the Sophisticated Tab settings screen. Reuses the backpack
+// tab chrome and overlays a comparator ItemStack as the "settings" glyph — keeps the
+// iconography in line with the rest of the row (real items, not flat icons). It is added to
+// the inventory + backpack screens by LegendaryTabsCompat.register() via addTabToScreen.
 public final class SettingsTab extends TabBase {
 
     private static final ResourceLocation TEXTURE =
-            new ResourceLocation("sophisticatedtab", "textures/gui/backpack_tab.png");
+            ResourceLocation.fromNamespaceAndPath("sophisticatedtab", "textures/gui/backpack_tab.png");
     private static final int CHROME_TEXTURE_W = 52;
     private static final int CHROME_TEXTURE_H = 22;
     private static final int HOVER_DX = 26;
     private static final int ICON_INSET_X = 5;
     private static final int ICON_INSET_Y = 3;
-
-    // Renders after all eight BackpackTab instances (priorities 20..27).
-    private static final int TAB_PRIORITY = 100;
-
-    private static final int VANILLA_INVENTORY_WIDTH = 176;
-    private static final int VANILLA_INVENTORY_HEIGHT = 166;
 
     private static final ItemStack GEAR_ICON = new ItemStack(Items.COMPARATOR);
 
@@ -48,14 +40,8 @@ public final class SettingsTab extends TabBase {
 
     @Override
     public void initTabOnScreens() {
-        TabsMenu.addTabToScreen(this, InventoryScreen.class,
-                p -> VANILLA_INVENTORY_WIDTH,
-                p -> VANILLA_INVENTORY_HEIGHT,
-                TAB_PRIORITY);
-        TabsMenu.addTabToScreen(this, BackpackScreen.class,
-                SophisticatedBackpacksSizing::getWidth,
-                SophisticatedBackpacksSizing::getHeight,
-                TAB_PRIORITY);
+        // Registration is handled by LegendaryTabsCompat.register() via addTabToScreen,
+        // not here — this tab is never passed to TabsMenu.register(), so this is never called.
     }
 
     @Override

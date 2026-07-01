@@ -2,33 +2,18 @@ pluginManagement {
     repositories {
         gradlePluginPortal()
         maven {
-            name = 'MinecraftForge'
-            url = 'https://maven.minecraftforge.net/'
+            name = 'NeoForged'
+            url = 'https://maven.neoforged.net/releases'
+        }
+        maven {
+            name = 'Parchment'
+            url = 'https://maven.parchmentmc.org'
         }
     }
 }
 
 plugins {
-    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.7.0'
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
 }
 
 rootProject.name = 'sophisticated-tab'
-
-// Composite-build hookup for sibling clones of the upstream mods.
-// If you clone LegendaryTabs and SophisticatedBackpacks beside this project,
-// Gradle resolves the deobf jars directly from those sources. If not, the build
-// falls back to the CurseMaven coordinates declared in build.gradle.
-def legendaryTabsClone = file('../LegendaryTabs')
-if (legendaryTabsClone.isDirectory() && new File(legendaryTabsClone, 'build.gradle').isFile()) {
-    includeBuild(legendaryTabsClone)
-}
-
-def sophisticatedBackpacksClone = file('../SophisticatedBackpacks')
-if (sophisticatedBackpacksClone.isDirectory() && new File(sophisticatedBackpacksClone, 'build.gradle').isFile()) {
-    includeBuild(sophisticatedBackpacksClone)
-}
-
-def sophisticatedCoreClone = file('../SophisticatedCore')
-if (sophisticatedCoreClone.isDirectory() && new File(sophisticatedCoreClone, 'build.gradle').isFile()) {
-    includeBuild(sophisticatedCoreClone)
-}

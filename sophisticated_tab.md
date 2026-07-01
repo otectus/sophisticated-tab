@@ -1,5 +1,40 @@
 # Forge 1.20.1 Integration Report for a LegendaryTabs Tab for Sophisticated Backpacks
 
+> **This report documents the original Forge 1.20.1 design.** The mod has since been ported to
+> **NeoForge 1.21.1** — see the port addendum immediately below for how the integration surface
+> changed. The 1.20.1 report is retained as the design record (the architecture, sizing math, and
+> UX rationale still apply); only the loader/dependency APIs differ.
+
+## NeoForge 1.21.1 Port Addendum
+
+On 1.21.1 the tabs mod is **Mod Tabs** (`modtabs`, package `vodmordia.modtabs.*`) — the NeoForge
+successor to Legendary Tabs (`legendarytabs`, `sfiomn.legendarytabs.*`), maintained by vodmordia
+under MIT. Wherever this report says "LegendaryTabs / `sfiomn.legendarytabs`", read "Mod Tabs /
+`vodmordia.modtabs`". The `TabBase` override surface (`openTargetScreen`, `isEnabled`,
+`initTabOnScreens`, `render`, `isCurrentlyUsed`, `getTooltip`, `TAB_WIDTH`/`TAB_HEIGHT`) is unchanged,
+and `TabsMenu.register(...)` / `TabsMenu.addTabToScreen(...)` / `TabButton.tabBase` still exist.
+
+Key API mapping (1.20.1 Forge → 1.21.1 NeoForge):
+
+| Concern | 1.20.1 (this report) | 1.21.1 NeoForge |
+|---|---|---|
+| Tabs mod | LegendaryTabs `sfiomn.legendarytabs.*` | Mod Tabs `vodmordia.modtabs.*` (+ MidnightLib) |
+| Per-backpack tabs | pre-registered pool of eight `BackpackTab` | `DynamicTabProvider` — one `BackpackTab` per backpack, no cap |
+| Open backpack | `SBPPacketHandler.INSTANCE.sendToServer(new BackpackOpenMessage(...))` | `PacketDistributor.sendToServer(new BackpackOpenPayload(slot, identifier, handlerName))` |
+| Wrapper lookup | `stack.getCapability(CapabilityBackpackWrapper...).orElse(null)` | `BackpackWrapper.fromStack(stack)` |
+| Mod entry / dist gate | `@Mod` + `FMLEnvironment.dist == Dist.CLIENT` | `@Mod(dist = Dist.CLIENT)` + injected `IEventBus` |
+| Event bus / tick | `MinecraftForge.EVENT_BUS`, `TickEvent.ClientTickEvent` (END) | `NeoForge.EVENT_BUS`, `ClientTickEvent.Post` |
+| ResourceLocation | `new ResourceLocation(ns, path)` | `ResourceLocation.fromNamespaceAndPath(ns, path)` |
+| Metadata / pack | `META-INF/mods.toml`, `pack_format 15`, JDK 17, Forge 47 | `META-INF/neoforge.mods.toml`, `pack_format 34`, JDK 21, NeoForge 21.1 |
+
+Two design deltas beyond the mechanical mapping: (1) the eight-tab pool is replaced by a
+`DynamicTabProvider` that emits one tab per carried backpack on each screen init, and
+`TabInteractionHandler` identifies our tabs by `tabBase instanceof BackpackTab` (reading the live
+`TabButton`s) instead of a pool index; (2) Mod Tabs ships its own built-in single Sophisticated
+Backpacks tab, so the addon disables it at startup (`Config.Baked.sophisticatedBackpacksTabEnabled =
+false`) to avoid a duplicate. The dynamic-sizing math for `BackpackScreen` (the "genuinely tricky
+part" this report calls out) is unchanged.
+
 ## Executive Summary
 
 The cleanest implementation is **not** to create a second vanilla creative-inventory tab. entity["software","Sophisticated Backpacks","Forge backpack and storage mod for Minecraft 1.20.1"] already registers its own `CreativeModeTab` named `"main"` with the title key `itemGroup.sophisticatedbackpacks`, while entity["software","LegendaryTabs","Forge client GUI navigation tabs mod for Minecraft 1.20.1"] exposes a separate GUI-tab API built around `TabBase` and `TabsMenu.register(...)`. So the right architecture is a **small client-focused compat addon** that registers a new `LegendaryTabs` screen-navigation tab which opens the first accessible Sophisticated Backpack via `SBPPacketHandler.INSTANCE.sendToServer(new BackpackOpenMessage())`. That preserves SophisticatedBackpacks’ existing creative tab and adds the missing top-of-screen navigation tab users actually want. citeturn32view0turn32view2turn9view0turn11view0turn12view0turn47view1turn47view2

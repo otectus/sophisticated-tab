@@ -1,0 +1,46 @@
+modLoader = "javafml"
+loaderVersion = "${loader_version_range}"
+license = "${mod_license}"
+issueTrackerURL = "https://github.com/otectus/sophisticated-tab/issues"
+
+[[mods]]
+modId = "${mod_id}"
+version = "${mod_version}"
+displayName = "${mod_name}"
+authors = "${mod_authors}"
+description = '''
+${mod_description}
+'''
+# Client-only mod that is safe to have on the client when connecting to a vanilla/other server.
+displayTest = "IGNORE_SERVER_VERSION"
+
+[[dependencies.${mod_id}]]
+    modId = "neoforge"
+    type = "required"
+    versionRange = "${neoforge_version_range}"
+    ordering = "NONE"
+    side = "BOTH"
+
+[[dependencies.${mod_id}]]
+    modId = "minecraft"
+    type = "required"
+    versionRange = "${minecraft_version_range}"
+    ordering = "NONE"
+    side = "BOTH"
+
+# Mod Tabs (NeoForge successor to Legendary Tabs). modId is "modtabs".
+# Verified-compatible build: 1.21.1-2.5.8 (DynamicTabProvider API). Range kept loose to
+# any 1.21.1 build; the actual API contract is enforced at compile time.
+[[dependencies.${mod_id}]]
+    modId = "modtabs"
+    type = "required"
+    versionRange = "[1.21.1,)"
+    ordering = "AFTER"
+    side = "CLIENT"
+
+[[dependencies.${mod_id}]]
+    modId = "sophisticatedbackpacks"
+    type = "required"
+    versionRange = "[3.24.0,)"
+    ordering = "AFTER"
+    side = "CLIENT"

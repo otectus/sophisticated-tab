@@ -6,34 +6,34 @@ import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
-import net.p3pp3rf1y.sophisticatedbackpacks.client.gui.BackpackScreen;
-import sfiomn.legendarytabs.api.tabs_menu.TabBase;
-import sfiomn.legendarytabs.api.tabs_menu.TabsMenu;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import vodmordia.modtabs.api.tabs_menu.TabBase;
 
-// LegendaryTabs' built-in InventoryTab only attaches to a hard-coded screen
-// list that does not include SophisticatedBackpacks' BackpackScreen. We add a
-// dedicated return-to-inventory tab on top of the SB screen so the user can
-// navigate back without closing the GUI.
+// A dedicated return-to-inventory tab on top of Sophisticated Backpacks' BackpackScreen
+// so the user can navigate back without closing the GUI. Drawn with our own chrome plus
+// a crafting-table glyph (the 1.20.1 build reused LegendaryTabs' button atlas, which no
+// longer exists under the renamed "modtabs" assets).
 public final class BackToInventoryTab extends TabBase {
 
     private static final ResourceLocation TEXTURE =
-            new ResourceLocation("legendarytabs", "textures/gui/tab_menu_buttons.png");
+            ResourceLocation.fromNamespaceAndPath("sophisticatedtab", "textures/gui/backpack_tab.png");
 
-    // Inventory sprite position in tab_menu_buttons.png — same coordinates
-    // LegendaryTabs uses for its own InventoryTab.
-    private static final int ICON_U = 0;
-    private static final int ICON_V = 0;
-    private static final int HOVER_DX = 54;
+    private static final int CHROME_TEXTURE_W = 52;
+    private static final int CHROME_TEXTURE_H = 22;
+    private static final int HOVER_DX = 26;
+    private static final int ICON_INSET_X = 5;
+    private static final int ICON_INSET_Y = 3;
 
-    // Priority < SophisticatedBackpacksTab's 20 so this tab appears first.
-    private static final int TAB_PRIORITY = 10;
+    private static final ItemStack INVENTORY_ICON = new ItemStack(Items.CRAFTING_TABLE);
 
     @Override
     public void openTargetScreen(Player player) {
-        // Closing the BackpackContainer via the vanilla path first tells the
-        // server the menu is gone (otherwise it stays "open" server-side while
-        // the client renders InventoryScreen → guaranteed desync on next click).
-        // The deferred setScreen runs on the next client tick.
+        // Closing the BackpackContainer first tells the server the menu is gone
+        // (otherwise it stays "open" server-side while the client renders
+        // InventoryScreen → guaranteed desync on next click). The coordinator
+        // sends the close packet without invoking setScreen(null), then swaps
+        // to InventoryScreen on the same tick.
         BackpackOpenCoordinator.openInventoryFromBackpack(player);
     }
 
@@ -44,16 +44,15 @@ public final class BackToInventoryTab extends TabBase {
 
     @Override
     public void initTabOnScreens() {
-        TabsMenu.addTabToScreen(this, BackpackScreen.class,
-                SophisticatedBackpacksSizing::getWidth,
-                SophisticatedBackpacksSizing::getHeight,
-                TAB_PRIORITY);
+        // Registration is handled by LegendaryTabsCompat.register() via addTabToScreen,
+        // not here — this tab is never passed to TabsMenu.register(), so this is never called.
     }
 
     @Override
     public void render(GuiGraphics gui, int x, int y, boolean hover) {
-        int u = ICON_U + (hover ? HOVER_DX : 0);
-        gui.blit(TEXTURE, x, y, u, ICON_V, TAB_WIDTH, TAB_HEIGHT);
+        int u = hover ? HOVER_DX : 0;
+        gui.blit(TEXTURE, x, y, u, 0, TAB_WIDTH, TAB_HEIGHT, CHROME_TEXTURE_W, CHROME_TEXTURE_H);
+        gui.renderItem(INVENTORY_ICON, x + ICON_INSET_X, y + ICON_INSET_Y);
     }
 
     @Override

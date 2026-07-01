@@ -315,14 +315,14 @@ public final class BackpackSettingsScreen extends Screen {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         if (mouseX >= listX && mouseX < listX + listW
                 && mouseY >= listY && mouseY < listY + listH) {
-            scrollOffset -= (int) Math.signum(delta);
+            scrollOffset -= (int) Math.signum(scrollY);
             clampScroll();
             return true;
         }
-        return super.mouseScrolled(mouseX, mouseY, delta);
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
     @Override

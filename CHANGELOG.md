@@ -6,8 +6,32 @@ All notable changes to **Sophisticated Tab** are documented here. Format roughly
 
 ### Planned
 
-- **NeoForge 1.21.1 port** if upstream Legendary Tabs and Sophisticated Backpacks both publish 1.21.1 builds.
 - **Sub-backpack tabs** — enumerate nested backpacks (`BackpackContext$ItemSubBackpack`) instead of stopping at top-level only.
+
+## [1.21.1-0.6.0] - 2026-06-30
+
+Port of `1.20.1-0.6.0` from **Forge 1.20.1 to NeoForge 1.21.1**. All v0.5.x/v0.6.0 behavior is preserved; the integration surface was rewritten for the 1.21.1 dependency APIs.
+
+### Changed
+
+- **Tabs mod: Legendary Tabs → [Mod Tabs](https://www.curseforge.com/minecraft/mc-mods/mod-tabs).** On 1.21.1 the upstream is Mod Tabs (mod id `legendarytabs` → `modtabs`, package `sfiomn.legendarytabs.*` → `vodmordia.modtabs.*`), the NeoForge successor maintained by vodmordia. The `TabBase` override surface is unchanged; registration uses `TabsMenu.addTabToScreen(...)` for the static tabs and the new `TabsMenu.registerDynamicProvider(...)` for the per-backpack tabs. Mod Tabs additionally requires **MidnightLib** at runtime.
+- **Per-backpack tabs are now dynamic — the eight-tab pool/cap is gone.** [BackpackTabProvider](src/main/java/dev/otectus/sophisticatedtab/client/compat/legendarytabs/BackpackTabProvider.java) implements Mod Tabs' `DynamicTabProvider` and contributes one [BackpackTab](src/main/java/dev/otectus/sophisticatedtab/client/compat/legendarytabs/BackpackTab.java) (each carrying its own `BackpackDescriptor`) per visible backpack on each screen init. This replaces the pre-registered pool of eight indexed tabs; there is no longer an upper bound on how many backpacks get a tab. [TabInteractionHandler](src/main/java/dev/otectus/sophisticatedtab/client/input/TabInteractionHandler.java) now identifies our tabs by `tabBase instanceof BackpackTab` (reading the live on-screen `TabButton`s) instead of a pool index, and calls `TabsMenu.reinitCurrentScreen()` after a drag-reorder so the bar rebuilds in place.
+- **Sophisticated Backpacks capability lookup → `BackpackWrapper.fromStack`.** [BackpackDescriptor.from](src/main/java/dev/otectus/sophisticatedtab/client/compat/legendarytabs/BackpackDescriptor.java) replaced the Forge `stack.getCapability(CapabilityBackpackWrapper.BACKPACK_WRAPPER_CAPABILITY).orElse(null)` lookup (LazyOptional, removed in NeoForge) with `IBackpackWrapper w = BackpackWrapper.fromStack(stack)`. `getContentsUuid()`, `getNumberOfSlotRows()`, `getColumnsTaken()`, `getInventoryHandler()`, and `PlayerInventoryProvider.runOnBackpacks(...)` are unchanged.
+- **Open packet: `BackpackOpenMessage`/`SBPPacketHandler` → `BackpackOpenPayload` via `PacketDistributor`.** Sophisticated Backpacks migrated its networking to vanilla `CustomPacketPayload`s. [BackpackOpenCoordinator](src/main/java/dev/otectus/sophisticatedtab/client/compat/legendarytabs/BackpackOpenCoordinator.java) now sends `net.neoforged.neoforge.network.PacketDistributor.sendToServer(new BackpackOpenPayload(slot, identifier, handlerName))`. The vanilla close-then-open coordination (`ServerboundContainerClosePacket`, `LocalPlayer.closeContainer` semantics) is unchanged.
+- **Loader plumbing: Forge → NeoForge.** `net.minecraftforge.*` → `net.neoforged.*`; `@Mod(dist = Dist.CLIENT)` with the mod event bus injected into the constructor (replaces `FMLJavaModLoadingContext` + the `FMLEnvironment.dist` gate); `MinecraftForge.EVENT_BUS` → `NeoForge.EVENT_BUS`; `TickEvent.ClientTickEvent` (phase END) → `ClientTickEvent.Post`; `RegisterKeyMappingsEvent`/`ScreenEvent`/`ClientPlayerNetworkEvent` moved to `net.neoforged.neoforge.client.event`; `FMLPaths` → `net.neoforged.fml.loading.FMLPaths`.
+- **Vanilla API churn.** `new ResourceLocation(ns, path)` → `ResourceLocation.fromNamespaceAndPath(ns, path)`; `Screen#mouseScrolled` gained a second scroll axis (`mouseScrolled(x, y, scrollX, scrollY)`); `META-INF/mods.toml` → `META-INF/neoforge.mods.toml` (`type="required"`, `neoforge` dependency); `pack_format` 15 → 34.
+- **Build system.** ForgeGradle → [ModDevGradle](https://github.com/neoforged/ModDevGradle) 2.0.x, Java 17 → 21, NeoForge 21.1.84, Parchment mappings; dependencies resolved via CurseMaven.
+
+### Fixed
+
+- **Duplicate tabs on first run.** The initial port registered each static tab through both `TabsMenu.register()` (global) and `addTabToScreen()`, and Mod Tabs' "all-tabs" screen registration (`finalizePendingRegistrations`) then re-added every globally-registered tab at a different priority bucket — so the Settings and Back tabs each rendered twice. Static tabs are now added via `addTabToScreen` only (never `register`), so each appears exactly once and only on its intended screens ([LegendaryTabsCompat](src/main/java/dev/otectus/sophisticatedtab/client/compat/legendarytabs/LegendaryTabsCompat.java)).
+- **Redundant backpack tab.** Mod Tabs ships its own built-in single "Sophisticated Backpacks" tab (enabled by default), which duplicated one of our per-backpack tabs. The addon now disables it on startup by setting Mod Tabs' `Config.Baked.sophisticatedBackpacksTabEnabled = false`. (If the user opens and saves Mod Tabs' config screen, MidnightLib may re-enable it until the next launch.)
+- **Defensive UUID de-dup.** [BackpackTabResolver.visible](src/main/java/dev/otectus/sophisticatedtab/client/compat/legendarytabs/BackpackTabResolver.java) now skips a descriptor whose contents UUID was already emitted, guarding against any double-enumeration surfacing as duplicate per-backpack tabs.
+
+### Notes
+
+- The internal package name `client/compat/legendarytabs/` is retained (it now targets `vodmordia.modtabs.*`); renaming it was unnecessary churn.
+- The back-to-inventory tab now draws our own chrome with a `crafting_table` glyph instead of reusing Legendary Tabs' button atlas (which no longer exists under the renamed `modtabs` assets).
 
 ## [1.20.1-0.6.0] - 2026-05-16
 

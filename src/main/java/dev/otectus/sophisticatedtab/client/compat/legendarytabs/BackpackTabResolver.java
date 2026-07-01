@@ -2,8 +2,10 @@ package dev.otectus.sophisticatedtab.client.compat.legendarytabs;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import dev.otectus.sophisticatedtab.client.prefs.BackpackTabPreferences;
@@ -25,12 +27,21 @@ public final class BackpackTabResolver {
         List<BackpackDescriptor> discovered = SophisticatedBackpacksLocator.findAllBackpacks(player);
         ProfileEntry prefs = BackpackTabPreferences.current();
 
+        // Defensive de-dup by contents UUID: a backpack should yield at most one tab even if it
+        // were enumerated twice. UUID-less backpacks (unopened / no contents UUID) are genuinely
+        // distinct and cannot be keyed, so they are always kept.
+        Set<UUID> seenUuids = new HashSet<>();
         List<DescriptorWithIndex> filtered = new ArrayList<>(discovered.size());
         for (int i = 0; i < discovered.size(); i++) {
             BackpackDescriptor d = discovered.get(i);
             Optional<UUID> id = d.uuid();
-            if (id.isPresent() && prefs.isHidden(id.get())) {
-                continue;
+            if (id.isPresent()) {
+                if (prefs.isHidden(id.get())) {
+                    continue;
+                }
+                if (!seenUuids.add(id.get())) {
+                    continue;
+                }
             }
             filtered.add(new DescriptorWithIndex(d, i));
         }

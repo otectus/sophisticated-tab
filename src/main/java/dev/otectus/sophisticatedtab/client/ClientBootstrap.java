@@ -1,16 +1,15 @@
 package dev.otectus.sophisticatedtab.client;
 
-import dev.otectus.sophisticatedtab.client.compat.legendarytabs.BackpackOpenCoordinator;
 import dev.otectus.sophisticatedtab.client.compat.legendarytabs.LegendaryTabsCompat;
 import dev.otectus.sophisticatedtab.client.input.KeyBindings;
 import dev.otectus.sophisticatedtab.client.input.TabInteractionHandler;
 import dev.otectus.sophisticatedtab.client.prefs.PreferencesStorage;
-import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.ModList;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.common.NeoForge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,13 +20,13 @@ public final class ClientBootstrap {
 
     public static void onClientSetup(FMLClientSetupEvent event) {
         ModList mods = ModList.get();
-        boolean hasLegendaryTabs = mods.isLoaded("legendarytabs");
+        boolean hasModTabs = mods.isLoaded("modtabs");
         boolean hasSophisticatedBackpacks = mods.isLoaded("sophisticatedbackpacks");
 
-        if (!hasLegendaryTabs || !hasSophisticatedBackpacks) {
+        if (!hasModTabs || !hasSophisticatedBackpacks) {
             LOG.warn(
-                    "Skipping LegendaryTabs registration (legendarytabs={}, sophisticatedbackpacks={}).",
-                    hasLegendaryTabs,
+                    "Skipping Mod Tabs registration (modtabs={}, sophisticatedbackpacks={}).",
+                    hasModTabs,
                     hasSophisticatedBackpacks);
             return;
         }
@@ -37,19 +36,18 @@ public final class ClientBootstrap {
             LegendaryTabsCompat.register();
         });
 
-        MinecraftForge.EVENT_BUS.register(ClientBootstrap.class);
-        MinecraftForge.EVENT_BUS.register(TabInteractionHandler.class);
+        NeoForge.EVENT_BUS.register(ClientBootstrap.class);
+        NeoForge.EVENT_BUS.register(TabInteractionHandler.class);
     }
 
     // Flush pending preference writes at most once per tick. Mutations mark the
     // model dirty; this drains the flag on the client thread so all I/O stays
-    // off the render path.
+    // off the render path. NeoForge replaced the phased TickEvent with separate
+    // Pre/Post events; Post mirrors the old Phase.END.
     @SubscribeEvent
-    public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) return;
+    public static void onClientTick(ClientTickEvent.Post event) {
         PreferencesStorage.flushIfDirty();
         KeyBindings.pollSettingsKey();
-        BackpackOpenCoordinator.tick();
     }
 
     // Guarantees a flush at the moment the player leaves the world / server,

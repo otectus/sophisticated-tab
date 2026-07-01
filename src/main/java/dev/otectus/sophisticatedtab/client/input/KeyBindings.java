@@ -4,8 +4,8 @@ import com.mojang.blaze3d.platform.InputConstants;
 import dev.otectus.sophisticatedtab.client.gui.BackpackSettingsScreen;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 
 // Single keybind registered on the mod bus. Polled from ClientBootstrap's tick
 // listener; default mapping is UNKNOWN so it never collides with another mod.

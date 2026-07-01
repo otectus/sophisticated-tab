@@ -132,9 +132,10 @@ public final class BackpackTabContextMenu extends Screen {
     }
 
     private void openBackpack() {
-        // Coordinator handles close-then-open sequencing if the parent inventory
-        // has stranded crafting / carried state. Otherwise it fast-paths the
-        // packet send. The eventual BackpackScreen replaces this menu.
+        // Coordinator sends a server close packet first if any container state
+        // would otherwise be left stranded (crafting input, carried stack, or
+        // a non-default containerMenu), then sends the open. The eventual
+        // BackpackScreen from the server response replaces this menu.
         BackpackOpenCoordinator.openBackpackFromTab(target);
     }
 
