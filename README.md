@@ -20,8 +20,14 @@ Backpacks are discovered through Sophisticated Backpacks' `PlayerInventoryProvid
 
 ### Stability and per-(world × player) scope hardening (v0.6.0)
 
-- **Visual ghost-item fix.** Tab opens (and the right-click `Open Backpack` action) now route through a `BackpackOpenCoordinator` that closes the previous container cleanly before opening the backpack. v0.5.x sent `BackpackOpenMessage` directly while `InventoryScreen` was active; vanilla's `ServerPlayer.openMenu` short-circuited its own close call in that case, leaving crafting input and the carried stack stranded server-side. The new flow fires `LocalPlayer.closeContainer()` (server returns the crafting input + cursor), defers one client tick, and re-resolves the target backpack by UUID before sending the open message. Back-to-inventory tab gets the same close-first treatment, eliminating a latent desync where the server kept the backpack menu open while the client rendered `InventoryScreen`.
+- **Visual ghost-item fix.** Tab opens (and the right-click `Open Backpack` action) now route through a `BackpackOpenCoordinator` that closes the previous container cleanly before opening the backpack. v0.5.x sent `BackpackOpenMessage` directly while `InventoryScreen` was active; vanilla's `ServerPlayer.openMenu` short-circuited its own close call in that case, leaving crafting input and the carried stack stranded server-side. The coordinator sends the container-close to the server first — so it returns the crafting input and carried stack — then sends the open. Back-to-inventory tab gets the same close-first treatment, eliminating a latent desync where the server kept the backpack menu open while the client rendered `InventoryScreen`. (v0.7.0 refines *how* the close is issued so it no longer recenters the mouse cursor — see the changelog.)
 - **Cross-world preferences leak fix.** Preference profile keys now scope by **world save folder + player UUID** (was: display name only). Two worlds named the same don't share preferences, and different Mojang accounts on the same machine don't inherit each other's hide/order state. `tab_preferences.json` is silently migrated from schema v1 to v2 on first launch — old entries are preserved under a `legacy/` prefix but never read, so nothing is deleted and nothing leaks.
+
+### Hide the Settings tab (v0.7.0)
+
+- **Right-click the gear tab → `Hide Settings Tab`.** The Settings (gear) tab now has its own right-click menu that removes it from the row. The tab disappears immediately.
+- **`Show/Hide Settings Tab` keybind.** `Options > Controls > Sophisticated Tab > Show/Hide Settings Tab` (default unbound) toggles the gear tab's visibility. Since hiding the gear tab removes the mouse path into the settings screen, **bind this key** — it's the intended way to bring the tab back. (The existing `Open Tab Settings` keybind also opens the settings screen independently of the tab.)
+- **Global, not per-world.** Unlike per-backpack hiding, the gear tab's hidden state is one flag for all worlds and servers, stored at the root of `config/sophisticatedtab/tab_preferences.json` as `settingsTabHidden`. If you ever hide the tab with no key bound, set `"settingsTabHidden": false` in that file to recover.
 
 The mod does **not** add a vanilla creative inventory category. Sophisticated Backpacks already registers one; duplicating it would be noise.
 
@@ -83,15 +89,17 @@ src/main/java/dev/otectus/sophisticatedtab/
    │  ├─ SophisticatedBackpacksLocator.java
    │  └─ SophisticatedBackpacksSizing.java
    ├─ prefs/
-   │  ├─ BackpackTabPreferences.java   # in-memory model: ordered/hidden UUIDs per profile (schema v2)
-   │  ├─ PreferencesStorage.java       # atomic JSON load/save under config/sophisticatedtab/; v1→v2 migration
+   │  ├─ BackpackTabPreferences.java   # in-memory model: ordered/hidden UUIDs per profile + global settingsTabHidden flag
+   │  ├─ PreferencesStorage.java       # atomic JSON load/save under config/sophisticatedtab/; v1→v2 migration; root settingsTabHidden
    │  ├─ ProfileResolver.java          # v2:sp/<folder>/<uuid> | v2:mp/<host:port>/<uuid> | v2:unknown (ephemeral)
    │  └─ BackpackScopeKey.java         # structured scope key (Kind + identity + player UUID)
    ├─ input/
-   │  ├─ TabInteractionHandler.java    # ScreenEvent.* listener — right-click menu, click vs drag, drop indicator
-   │  └─ KeyBindings.java              # RegisterKeyMappingsEvent + ClientTickEvent polling
+   │  ├─ TabInteractionHandler.java    # ScreenEvent.* listener — right-click menus (backpack + settings), click vs drag, drop indicator
+   │  └─ KeyBindings.java              # RegisterKeyMappingsEvent + ClientTickEvent polling (Open Settings + Show/Hide Settings Tab)
    └─ gui/
-      ├─ BackpackTabContextMenu.java   # right-click popup (Open / Move L|R / Hide)
+      ├─ AbstractTabContextMenu.java   # shared popup base: dimmed parent, Entry stack, click-outside dismiss, edge clamp
+      ├─ BackpackTabContextMenu.java   # backpack-tab popup (Open / Move L|R / Hide)
+      ├─ SettingsTabContextMenu.java   # gear-tab popup (Hide Settings Tab)
       └─ BackpackSettingsScreen.java   # full settings GUI (visibility toggles + reset buttons)
 
 src/main/resources/assets/sophisticatedtab/
