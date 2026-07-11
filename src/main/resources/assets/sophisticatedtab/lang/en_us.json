@@ -8,6 +8,7 @@
   "gui.sophisticatedtab.context.moveLeft": "Move Left",
   "gui.sophisticatedtab.context.moveRight": "Move Right",
   "gui.sophisticatedtab.context.hide": "Hide This Backpack",
+  "gui.sophisticatedtab.context.hideSettings": "Hide Settings Tab",
 
   "gui.sophisticatedtab.settings.title": "Sophisticated Tab — Settings",
   "gui.sophisticatedtab.settings.section.carried": "Currently Carried",
@@ -24,5 +25,6 @@
   "gui.sophisticatedtab.settings.empty": "No backpacks carried.",
 
   "key.categories.sophisticatedtab": "Sophisticated Tab",
-  "key.sophisticatedtab.openSettings": "Open Tab Settings"
+  "key.sophisticatedtab.openSettings": "Open Tab Settings",
+  "key.sophisticatedtab.toggleSettingsTab": "Show/Hide Settings Tab"
 }

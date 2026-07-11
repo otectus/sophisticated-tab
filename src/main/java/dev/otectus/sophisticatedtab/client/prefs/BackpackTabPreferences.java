@@ -27,6 +27,11 @@ public final class BackpackTabPreferences {
     private static final Map<String, ProfileEntry> PROFILES = new HashMap<>();
     private static final AtomicBoolean DIRTY = new AtomicBoolean(false);
 
+    // Global (not per-scope) chrome preference: whether the Settings tab is
+    // hidden from the LT row. Unlike per-backpack hiding this is one flag for
+    // all worlds/servers, persisted at the JSON root by PreferencesStorage.
+    private static boolean settingsTabHidden = false;
+
     // Sentinel returned by current() when scope is UNKNOWN (no player, no
     // server). Reads return empty collections; all mutators no-op so we don't
     // accumulate session-wide garbage that gets flushed under a global key.
@@ -64,6 +69,25 @@ public final class BackpackTabPreferences {
 
     public static void markDirty() {
         DIRTY.set(true);
+    }
+
+    // ----- Global settings-tab visibility -------------------------------------
+
+    public static boolean isSettingsTabHidden() {
+        return settingsTabHidden;
+    }
+
+    public static void setSettingsTabHidden(boolean hidden) {
+        if (settingsTabHidden != hidden) {
+            settingsTabHidden = hidden;
+            markDirty();
+        }
+    }
+
+    // Load-time apply that does NOT mark dirty (mirrors replaceAll clearing the
+    // dirty flag after a fresh load).
+    public static void restoreSettingsTabHidden(boolean hidden) {
+        settingsTabHidden = hidden;
     }
 
     // ----- ProfileEntry -------------------------------------------------------

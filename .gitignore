@@ -35,3 +35,10 @@ forge-*-changelog.txt
 # input, throwaway investigation scripts, preview PNGs).
 .tools/*
 !.tools/generate_tab_chrome.py
+
+# Claude Code session artifacts (isolated worktrees, local config).
+.claude/
+
+# Stray mod jars accidentally dropped in the repo root (dependencies, test
+# fixtures). Build outputs already live under the ignored build/ directory.
+/*.jar

@@ -1,6 +1,5 @@
 package dev.otectus.sophisticatedtab.client;
 
-import dev.otectus.sophisticatedtab.client.compat.legendarytabs.BackpackOpenCoordinator;
 import dev.otectus.sophisticatedtab.client.compat.legendarytabs.LegendaryTabsCompat;
 import dev.otectus.sophisticatedtab.client.input.KeyBindings;
 import dev.otectus.sophisticatedtab.client.input.TabInteractionHandler;
@@ -48,8 +47,7 @@ public final class ClientBootstrap {
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         PreferencesStorage.flushIfDirty();
-        KeyBindings.pollSettingsKey();
-        BackpackOpenCoordinator.tick();
+        KeyBindings.pollKeys();
     }
 
     // Guarantees a flush at the moment the player leaves the world / server,

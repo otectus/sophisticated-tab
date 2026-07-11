@@ -1,6 +1,7 @@
 package dev.otectus.sophisticatedtab.client.compat.legendarytabs;
 
 import dev.otectus.sophisticatedtab.client.gui.BackpackSettingsScreen;
+import dev.otectus.sophisticatedtab.client.prefs.BackpackTabPreferences;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -37,7 +38,7 @@ public final class SettingsTab extends TabBase {
 
     @Override
     public boolean isEnabled(Player player) {
-        return true;
+        return !BackpackTabPreferences.isSettingsTabHidden();
     }
 
     @Override

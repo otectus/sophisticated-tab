@@ -51,12 +51,14 @@ public final class PreferencesStorage {
         if (!Files.isRegularFile(path)) {
             LOG.info("No tab_preferences.json present at {}; using defaults.", path);
             BackpackTabPreferences.replaceAll(new HashMap<>());
+            BackpackTabPreferences.restoreSettingsTabHidden(false);
             return;
         }
         try (Reader r = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
             JsonElement root = JsonParser.parseReader(r);
             ParseResult result = parse(root);
             BackpackTabPreferences.replaceAll(result.profiles());
+            BackpackTabPreferences.restoreSettingsTabHidden(result.settingsTabHidden());
             if (result.migrated()) {
                 // Force a rewrite at the new schema so the migrated keys (and
                 // version bump) hit disk on the next tick.
@@ -70,6 +72,7 @@ public final class PreferencesStorage {
             LOG.warn("Failed to parse {}: {}. Renaming and starting fresh.", path, e.getMessage());
             quarantine(path);
             BackpackTabPreferences.replaceAll(new HashMap<>());
+            BackpackTabPreferences.restoreSettingsTabHidden(false);
         }
     }
 
@@ -99,17 +102,22 @@ public final class PreferencesStorage {
 
     // ----- parsing ------------------------------------------------------------
 
-    // Result of parsing: the loaded profiles plus a flag indicating whether
-    // any v1 keys were migrated to the legacy/ prefix (and thus the file
-    // should be rewritten at the new schema version).
-    record ParseResult(Map<String, ProfileEntry> profiles, boolean migrated) {}
+    // Result of parsing: the loaded profiles, a flag indicating whether any v1
+    // keys were migrated to the legacy/ prefix (and thus the file should be
+    // rewritten at the new schema version), and the global settings-tab-hidden
+    // flag read from the JSON root.
+    record ParseResult(Map<String, ProfileEntry> profiles, boolean migrated, boolean settingsTabHidden) {}
 
     static ParseResult parse(JsonElement root) {
         Map<String, ProfileEntry> out = new HashMap<>();
         if (root == null || !root.isJsonObject()) {
-            return new ParseResult(out, false);
+            return new ParseResult(out, false, false);
         }
         JsonObject obj = root.getAsJsonObject();
+        boolean settingsTabHidden = obj.has("settingsTabHidden")
+                && obj.get("settingsTabHidden").isJsonPrimitive()
+                && obj.get("settingsTabHidden").getAsJsonPrimitive().isBoolean()
+                && obj.get("settingsTabHidden").getAsBoolean();
         int version = obj.has("version") && obj.get("version").isJsonPrimitive()
                 ? obj.get("version").getAsInt() : BackpackTabPreferences.SCHEMA_VERSION;
         if (version > BackpackTabPreferences.SCHEMA_VERSION) {
@@ -117,7 +125,7 @@ public final class PreferencesStorage {
                     version, BackpackTabPreferences.SCHEMA_VERSION);
         }
         if (!obj.has("profiles") || !obj.get("profiles").isJsonObject()) {
-            return new ParseResult(out, false);
+            return new ParseResult(out, false, settingsTabHidden);
         }
         // v1 keyed by display-name (e.g. "singleplayer:NewWorld"); those collide
         // across worlds with the same display name and leaked stale UUIDs into
@@ -144,7 +152,7 @@ public final class PreferencesStorage {
             readUuids(p, "hiddenBackpacks").forEach(entry.hiddenBackpacks()::add);
             out.put(key, entry);
         }
-        return new ParseResult(out, migrated);
+        return new ParseResult(out, migrated, settingsTabHidden);
     }
 
     private static List<UUID> readUuids(JsonObject parent, String key) {
@@ -171,6 +179,7 @@ public final class PreferencesStorage {
 
         JsonObject root = new JsonObject();
         root.addProperty("version", BackpackTabPreferences.SCHEMA_VERSION);
+        root.addProperty("settingsTabHidden", BackpackTabPreferences.isSettingsTabHidden());
         JsonObject profilesJson = new JsonObject();
         // Sort keys for stable diffs across saves.
         Map<String, ProfileEntry> sorted = new LinkedHashMap<>();

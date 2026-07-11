@@ -1,0 +1,7 @@
+# Normalize all text files to LF in the repository. Prevents accidental
+# whole-repo line-ending flips (e.g. a Windows round-trip) from churning
+# every file in a diff. Binaries are marked so they're never touched.
+* text=auto eol=lf
+
+*.png binary
+*.jar binary

@@ -30,10 +30,11 @@ public final class BackToInventoryTab extends TabBase {
 
     @Override
     public void openTargetScreen(Player player) {
-        // Closing the BackpackContainer via the vanilla path first tells the
-        // server the menu is gone (otherwise it stays "open" server-side while
-        // the client renders InventoryScreen → guaranteed desync on next click).
-        // The deferred setScreen runs on the next client tick.
+        // Closing the BackpackContainer first tells the server the menu is gone
+        // (otherwise it stays "open" server-side while the client renders
+        // InventoryScreen → guaranteed desync on next click). The coordinator
+        // sends the close packet without invoking setScreen(null), then swaps
+        // to InventoryScreen on the same tick.
         BackpackOpenCoordinator.openInventoryFromBackpack(player);
     }
 

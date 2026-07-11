@@ -10,7 +10,9 @@ import dev.otectus.sophisticatedtab.client.compat.legendarytabs.BackpackDescript
 import dev.otectus.sophisticatedtab.client.compat.legendarytabs.BackpackTab;
 import dev.otectus.sophisticatedtab.client.compat.legendarytabs.BackpackTabResolver;
 import dev.otectus.sophisticatedtab.client.compat.legendarytabs.LegendaryTabsCompat;
+import dev.otectus.sophisticatedtab.client.compat.legendarytabs.SettingsTab;
 import dev.otectus.sophisticatedtab.client.gui.BackpackTabContextMenu;
+import dev.otectus.sophisticatedtab.client.gui.SettingsTabContextMenu;
 import dev.otectus.sophisticatedtab.client.prefs.BackpackTabPreferences;
 import dev.otectus.sophisticatedtab.client.prefs.BackpackTabPreferences.ProfileEntry;
 import net.minecraft.client.Minecraft;
@@ -145,6 +147,14 @@ public final class TabInteractionHandler {
                                          Screen screen, double mx, double my) {
         Optional<TabHit> hit = hitTest(screen, mx, my);
         if (hit.isEmpty()) {
+            // Not a backpack tab — check the Settings tab, which has its own menu.
+            Optional<int[]> settingsAnchor = settingsTabHit(screen, mx, my);
+            if (settingsAnchor.isPresent()) {
+                event.setCanceled(true);
+                resetState();
+                Minecraft.getInstance().setScreen(
+                        new SettingsTabContextMenu(screen, settingsAnchor.get()[0], settingsAnchor.get()[1]));
+            }
             return;
         }
         Player player = Minecraft.getInstance().player;
@@ -302,6 +312,28 @@ public final class TabInteractionHandler {
             if (within(button, mouseX, mouseY)) {
                 return Optional.of(new TabHit(match, button,
                         button.getX(), button.getY() + button.getHeight()));
+            }
+        }
+        return Optional.empty();
+    }
+
+    // Locate the Settings tab button under the cursor. Returns its anchor
+    // coords {x, y-below-button} for the context menu, or empty if the cursor
+    // isn't over it. The Settings tab is not in the BackpackTab pool, so hitTest
+    // ignores it — this is a separate identity check by type.
+    private static Optional<int[]> settingsTabHit(Screen screen, double mouseX, double mouseY) {
+        if (screen == null) {
+            return Optional.empty();
+        }
+        for (GuiEventListener child : screen.children()) {
+            if (!(child instanceof TabButton button)) {
+                continue;
+            }
+            if (!(readTabBase(button) instanceof SettingsTab)) {
+                continue;
+            }
+            if (within(button, mouseX, mouseY)) {
+                return Optional.of(new int[] { button.getX(), button.getY() + button.getHeight() });
             }
         }
         return Optional.empty();
